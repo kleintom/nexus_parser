@@ -251,12 +251,13 @@ module NexusParser::Tokens
     def initialize(str)
       # a little oddness here, in some case we don't want to include the .0
       # see issues with numbers as labels
-      if str =~ /\./
-        @value = str.to_f
+      if str =~ /[eE]/
+        @value = str
+      elsif str =~ /\./
+        @value = str.to_f.to_s
       else
-        @value = str.to_i
+        @value = str
       end
-
     end
   end
 

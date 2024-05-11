@@ -77,16 +77,16 @@ class Test_Lexer < Test::Unit::TestCase
     assert lexer4.pop(NexusParser::Tokens::BeginBlk)
     assert lexer4.pop(NexusParser::Tokens::ChrsBlk)
     assert foo = lexer4.pop(NexusParser::Tokens::Number)
-    assert_equal(123123123, foo.value)
+    assert_equal('123123123', foo.value)
     assert lexer4.pop(NexusParser::Tokens::BlkEnd)
 
     lexer5 = NexusParser::Lexer.new("(0,1)")
     assert lexer5.pop(NexusParser::Tokens::LParen)
     assert foo = lexer5.pop(NexusParser::Tokens::Number)
-    assert_equal(0, foo.value)
+    assert_equal('0', foo.value)
     assert lexer5.pop(NexusParser::Tokens::Comma)
     assert foo = lexer5.pop(NexusParser::Tokens::Number)
-    assert_equal(1, foo.value)
+    assert_equal('1', foo.value)
     assert lexer5.pop(NexusParser::Tokens::RParen)
 
     lexer6 =  NexusParser::Lexer.new(" 210(0,1)10A1\n")
@@ -461,6 +461,15 @@ class Test_Lexer < Test::Unit::TestCase
     assert foo = lexer.pop(NexusParser::Tokens::SetsBlk)
     assert_equal 'SETS', foo.value.slice(0,4)
     assert_equal 'END;', foo.value.slice(-4,4)
+  end
+
+  def text_Numbers
+    lexer = NexusParser::Lexer.new('-3.5 1e1 3.5e-4 500 3.0')
+
+    assert_equal(lexer.pop(NexusParser::Tokesn::Number).value, -3.5)
+    assert_equal(lexer.pop(NexusParser::Tokesn::Number).value, 1)
+    assert_equal(lexer.pop(NexusParser::Tokesn::Number).value, 0.00035)
+    assert_equal(lexer.pop(NexusParser::Tokesn::Number).value, 3)
   end
 
   def test_lexer_errors
