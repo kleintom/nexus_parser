@@ -204,15 +204,19 @@ class NexusParser::Parser
         if !@lexer.peek(NexusParser::Tokens::Comma) || !@lexer.peek(NexusParser::Tokens::SemiColon)
           i = 0
 
-          # Number matching is given priority over Label matching (see Tokens
-          # list) but both are parsed into strings, so we're really matching
-          # against the union of those two tokens here.
-          while @lexer.peek(NexusParser::Tokens::Number) || @lexer.peek(NexusParser::Tokens::Label)
-            if @lexer.peek(NexusParser::Tokens::Number)
-              opts.update({i.to_s => @lexer.pop(NexusParser::Tokens::Number).value.to_s})
-            elsif @lexer.peek(NexusParser::Tokens::Label)
-              opts.update({i.to_s => @lexer.pop(NexusParser::Tokens::Label).value})
+          while @lexer.peek_no_cache_read(NexusParser::Tokens::Label) ||
+            @lexer.peek_no_cache_read(NexusParser::Tokens::DashLabel)
+
+            if @lexer.peek_no_cache_read(NexusParser::Tokens::Label)
+              opts.update({
+                i.to_s => @lexer.pop(NexusParser::Tokens::Label).value
+              })
+            elsif @lexer.peek_no_cache_read(NexusParser::Tokens::DashLabel)
+              opts.update({
+                i.to_s => @lexer.pop(NexusParser::Tokens::DashLabel).value
+              })
             end
+
             i += 1
           end
         end

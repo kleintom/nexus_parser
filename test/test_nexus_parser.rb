@@ -124,17 +124,17 @@ class Test_Lexer < Test::Unit::TestCase
   end
 
   def test_peek_no_cache_read
-    lexer = NexusParser::Lexer.new('123abc 456e-3def 789=ghi ')
+    lexer = NexusParser::Lexer.new('123abc -456e-3def 789=ghi ')
 
     assert lexer.peek(NexusParser::Tokens::Number)
     assert lexer.peek_no_cache_read(NexusParser::Tokens::Label)
     assert l1 = lexer.pop(NexusParser::Tokens::Label)
     assert_equal('123abc', l1.value)
 
-    assert lexer.peek(NexusParser::Tokens::Label)
+    assert lexer.peek(NexusParser::Tokens::DashLabel)
     assert lexer.peek_no_cache_read(NexusParser::Tokens::Number)
     assert n1 = lexer.pop(NexusParser::Tokens::Number)
-    assert_equal('456e-3', n1.value)
+    assert_equal('-456e-3', n1.value)
     assert l2 = lexer.pop(NexusParser::Tokens::Label)
     assert_equal('def', l2.value)
 
@@ -707,6 +707,30 @@ class Test_Parser < Test::Unit::TestCase
     assert_equal ["-", "0", "1", "2", "A"], foo.characters[4].state_labels
   end
 
+  def test_characters_block_with_dash_label
+    input=  "
+      DIMENSIONS  NCHAR=1;
+      FORMAT DATATYPE = STANDARD GAP = - MISSING = ? SYMBOLS = \"  0 1 2 3 4 5 6 7 8 9 A\";
+      CHARSTATELABELS
+        1 Tibia_III /  -123norm ;
+      MATRIX
+      Dictyna                0
+    ;
+    ENDBLOCK;"
+
+    builder = NexusParser::Builder.new
+    @lexer = NexusParser::Lexer.new(input)
+
+    # stub the taxa, they would otherwise get added in dimensions or taxa block
+    builder.stub_taxon
+
+    NexusParser::Parser.new(@lexer, builder).parse_characters_blk
+    foo = builder.nexus_file
+
+    assert_equal "-123norm", foo.characters[0].states["0"].name
+    assert_equal ["0"], foo.codings[0][0].states
+  end
+
   def test_characters_block_from_file
     foo = parse_nexus_file(@nf)
     assert_equal 10, foo.characters.size
@@ -843,26 +867,50 @@ class Test_Parser < Test::Unit::TestCase
 
   end
 
-  # https://github.com/mjy/nexus_parser/issues/9
-  def test_three_both_numeric_and_label_state_names_in_a_row
-    input =" CHARSTATELABELS
-    1 'Metatarsal trichobothria (CodAra.29)' / 3 9 27 asdf;
-    Matrix
-    fooo 01 more stuff here that should not be hit"
+  def test_number_label_chr_state_labels
+    # Character state names that are Labels but start with Numbers
+    input = 'CHARSTATELABELS 1 Tibia_II /
+      123abc
+      1.23abc
+      3e-3abc
+      25%_or_less_than
+      ;'
 
     builder = NexusParser::Builder.new
     lexer = NexusParser::Lexer.new(input)
 
-    builder.stub_chr()
+    (0..3).each{builder.stub_chr()}
 
-    NexusParser::Parser.new(lexer, builder).parse_chr_state_labels
+    NexusParser::Parser.new(lexer,builder).parse_chr_state_labels
 
     foo = builder.nexus_file
 
-    assert_equal "3", foo.characters[0].states['0'].name
-    assert_equal "9", foo.characters[0].states['1'].name
-    assert_equal "27", foo.characters[0].states['2'].name
-    assert_equal "asdf", foo.characters[0].states['3'].name
+    assert_equal "123abc", foo.characters[0].states["0"].name
+    assert_equal "1.23abc", foo.characters[0].states["1"].name
+    assert_equal "3e-3abc", foo.characters[0].states["2"].name
+    assert_equal "25%_or_less_than", foo.characters[0].states["3"].name
+  end
+
+  def test_value_pair_label_chr_state_labels
+    # Character state names that are both Labels and ValuePairs
+    input = 'CHARSTATELABELS 1 Tibia_II /
+      n=2
+      a==b
+      234=abc
+      ;'
+
+    builder = NexusParser::Builder.new
+    lexer = NexusParser::Lexer.new(input)
+
+    (0..2).each{builder.stub_chr()}
+
+    NexusParser::Parser.new(lexer,builder).parse_chr_state_labels
+
+    foo = builder.nexus_file
+
+    assert_equal "n=2", foo.characters[0].states["0"].name
+    assert_equal "a==b", foo.characters[0].states["1"].name
+    assert_equal "234=abc", foo.characters[0].states["2"].name
   end
 
   def DONT_test_parse_really_long_string_of_chr_state_labels
