@@ -123,6 +123,28 @@ class Test_Lexer < Test::Unit::TestCase
     # assert lexer.pop(NexusParser::Tokens::SemiColon)
   end
 
+  def test_peek_no_cache_read
+    lexer = NexusParser::Lexer.new('123abc 456e-3def 789=ghi ')
+
+    assert lexer.peek(NexusParser::Tokens::Number)
+    assert lexer.peek_no_cache_read(NexusParser::Tokens::Label)
+    assert l1 = lexer.pop(NexusParser::Tokens::Label)
+    assert_equal('123abc', l1.value)
+
+    assert lexer.peek(NexusParser::Tokens::Label)
+    assert lexer.peek_no_cache_read(NexusParser::Tokens::Number)
+    assert n1 = lexer.pop(NexusParser::Tokens::Number)
+    assert_equal('456e-3', n1.value)
+    assert l2 = lexer.pop(NexusParser::Tokens::Label)
+    assert_equal('def', l2.value)
+
+    assert lexer.peek(NexusParser::Tokens::Number)
+    assert lexer.peek_no_cache_read(NexusParser::Tokens::Label)
+    assert lexer.peek_no_cache_read(NexusParser::Tokens::ValuePair)
+    assert vp = lexer.pop(NexusParser::Tokens::ValuePair)
+    assert_equal({'789'.to_sym => 'ghi'}, vp.value)
+  end
+
   def test_row_vec
     lexer = NexusParser::Lexer.new("0?(0 1)10(A BD , C)1(0,1,2)1-\n")
     assert foo = lexer.pop(NexusParser::Tokens::RowVec)
