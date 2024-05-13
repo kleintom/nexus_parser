@@ -260,19 +260,8 @@ module NexusParser::Tokens
     @regexp = Regexp.new('\A\s*(\,)\s*')
   end
 
-  class Number < Token
-    @regexp = Regexp.new('\A\s*(-?\d+(\.\d+)?([eE][+-]?\d+)?)\s*')
-    def initialize(str)
-      # a little oddness here, in some case we don't want to include the .0
-      # see issues with numbers as labels
-      if str =~ /[eE]/
-        @value = str
-      elsif str =~ /\./
-        @value = str.to_f.to_s
-      else
-        @value = str
-      end
-    end
+  class PositiveInteger < Token
+    @regexp = Regexp.new('\A\s*(\d+)\s*')
   end
 
   # NexusParser::Tokens::NexusComment
@@ -302,7 +291,6 @@ module NexusParser::Tokens
       NexusParser::Tokens::ValuePair,  # this has bad overlap with Label
       NexusParser::Tokens::CharStateLabels,
       NexusParser::Tokens::ChrsBlk,
-      NexusParser::Tokens::Number, # partial overlap with Label
       NexusParser::Tokens::Matrix,
       NexusParser::Tokens::SemiColon,
       NexusParser::Tokens::MesquiteIDs,

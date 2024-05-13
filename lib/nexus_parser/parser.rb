@@ -197,9 +197,9 @@ class NexusParser::Parser
         name = ""
 
         # Need a no_cache_read here since the SemiColon peek above could have
-        # matched a ValuePair like '1 =3 / yes no' (or any other non-Number
-        # token) instead of the Number 1.
-        (index = @lexer.pop(NexusParser::Tokens::Number).value.to_i) if @lexer.peek_no_cache_read(NexusParser::Tokens::Number)
+        # matched a ValuePair like '1 =3 / yes no' (or some other
+        # non-PositiveInteger token) instead of the PositiveInteger 1.
+        (index = @lexer.pop(NexusParser::Tokens::PositiveInteger).value.to_i) if @lexer.peek_no_cache_read(NexusParser::Tokens::PositiveInteger)
 
         (name = @lexer.pop(NexusParser::Tokens::CharacterLabel).value) if @lexer.peek(NexusParser::Tokens::CharacterLabel) # not always given a letter
 

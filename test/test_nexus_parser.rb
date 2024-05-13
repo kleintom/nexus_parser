@@ -76,16 +76,16 @@ class Test_Lexer < Test::Unit::TestCase
     lexer4 = NexusParser::Lexer.new("Begin Characters; 123123123 end; [] ()  some crud here")
     assert lexer4.pop(NexusParser::Tokens::BeginBlk)
     assert lexer4.pop(NexusParser::Tokens::ChrsBlk)
-    assert foo = lexer4.pop(NexusParser::Tokens::Number)
+    assert foo = lexer4.pop(NexusParser::Tokens::PositiveInteger)
     assert_equal('123123123', foo.value)
     assert lexer4.pop(NexusParser::Tokens::BlkEnd)
 
     lexer5 = NexusParser::Lexer.new("(0,1)")
     assert lexer5.pop(NexusParser::Tokens::LParen)
-    assert foo = lexer5.pop(NexusParser::Tokens::Number)
+    assert foo = lexer5.pop(NexusParser::Tokens::PositiveInteger)
     assert_equal('0', foo.value)
     assert lexer5.pop(NexusParser::Tokens::Comma)
-    assert foo = lexer5.pop(NexusParser::Tokens::Number)
+    assert foo = lexer5.pop(NexusParser::Tokens::PositiveInteger)
     assert_equal('1', foo.value)
     assert lexer5.pop(NexusParser::Tokens::RParen)
 
@@ -124,21 +124,21 @@ class Test_Lexer < Test::Unit::TestCase
   end
 
   def test_peek_no_cache_read
-    lexer = NexusParser::Lexer.new('123abc -456e-3def 789=ghi ')
+    lexer = NexusParser::Lexer.new('123abc 456e-3def 789=ghi ')
 
-    assert lexer.peek(NexusParser::Tokens::Number)
+    assert lexer.peek(NexusParser::Tokens::PositiveInteger)
     assert lexer.peek_no_cache_read(NexusParser::Tokens::Label)
     assert l1 = lexer.pop(NexusParser::Tokens::Label)
     assert_equal('123abc', l1.value)
 
     assert lexer.peek(NexusParser::Tokens::CharacterLabel)
-    assert lexer.peek_no_cache_read(NexusParser::Tokens::Number)
-    assert n1 = lexer.pop(NexusParser::Tokens::Number)
-    assert_equal('-456e-3', n1.value)
+    assert lexer.peek_no_cache_read(NexusParser::Tokens::PositiveInteger)
+    assert n1 = lexer.pop(NexusParser::Tokens::PositiveInteger)
+    assert_equal('456', n1.value)
     assert l2 = lexer.pop(NexusParser::Tokens::Label)
-    assert_equal('def', l2.value)
+    assert_equal('e-3def', l2.value)
 
-    assert lexer.peek(NexusParser::Tokens::Number)
+    assert lexer.peek(NexusParser::Tokens::PositiveInteger)
     assert lexer.peek_no_cache_read(NexusParser::Tokens::Label)
     assert lexer.peek_no_cache_read(NexusParser::Tokens::ValuePair)
     assert vp = lexer.pop(NexusParser::Tokens::ValuePair)
@@ -949,7 +949,7 @@ class Test_Parser < Test::Unit::TestCase
 
 
   def test_number_label_chr_state_labels
-    # Character state names that start with Numbers
+    # Character state names that start with numbers
     input = 'CHARSTATELABELS 1 Tibia_II /
       123abc
       -1.23abc
