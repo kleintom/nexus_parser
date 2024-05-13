@@ -131,7 +131,7 @@ class Test_Lexer < Test::Unit::TestCase
     assert l1 = lexer.pop(NexusParser::Tokens::Label)
     assert_equal('123abc', l1.value)
 
-    assert lexer.peek(NexusParser::Tokens::DashLabel)
+    assert lexer.peek(NexusParser::Tokens::CharacterLabel)
     assert lexer.peek_no_cache_read(NexusParser::Tokens::Number)
     assert n1 = lexer.pop(NexusParser::Tokens::Number)
     assert_equal('-456e-3', n1.value)
@@ -485,15 +485,6 @@ class Test_Lexer < Test::Unit::TestCase
     assert_equal 'END;', foo.value.slice(-4,4)
   end
 
-  def text_Numbers
-    lexer = NexusParser::Lexer.new('-3.5 1e1 3.5e-4 500 3.0')
-
-    assert_equal(lexer.pop(NexusParser::Tokesn::Number).value, -3.5)
-    assert_equal(lexer.pop(NexusParser::Tokesn::Number).value, 1)
-    assert_equal(lexer.pop(NexusParser::Tokesn::Number).value, 0.00035)
-    assert_equal(lexer.pop(NexusParser::Tokesn::Number).value, 3)
-  end
-
   def test_lexer_errors
     lexer = NexusParser::Lexer.new("*&")
     assert_raise(NexusParser::ParseError) {lexer.peek(NexusParser::Tokens::Label)}
@@ -707,30 +698,6 @@ class Test_Parser < Test::Unit::TestCase
     assert_equal ["-", "0", "1", "2", "A"], foo.characters[4].state_labels
   end
 
-  def test_characters_block_with_dash_label
-    input=  "
-      DIMENSIONS  NCHAR=1;
-      FORMAT DATATYPE = STANDARD GAP = - MISSING = ? SYMBOLS = \"  0 1 2 3 4 5 6 7 8 9 A\";
-      CHARSTATELABELS
-        1 Tibia_III /  -123norm ;
-      MATRIX
-      Dictyna                0
-    ;
-    ENDBLOCK;"
-
-    builder = NexusParser::Builder.new
-    @lexer = NexusParser::Lexer.new(input)
-
-    # stub the taxa, they would otherwise get added in dimensions or taxa block
-    builder.stub_taxon
-
-    NexusParser::Parser.new(@lexer, builder).parse_characters_blk
-    foo = builder.nexus_file
-
-    assert_equal "-123norm", foo.characters[0].states["0"].name
-    assert_equal ["0"], foo.codings[0][0].states
-  end
-
   def test_characters_block_from_file
     foo = parse_nexus_file(@nf)
     assert_equal 10, foo.characters.size
@@ -784,6 +751,46 @@ class Test_Parser < Test::Unit::TestCase
     assert_equal "-", foo.vars[:gap]
     assert_equal "?", foo.vars[:missing]
     assert_equal '0 1 2 3 4 5 6 7 8 9 A', foo.vars[:symbols]
+  end
+
+  def test_arbitrary_unquoted_character_names
+    input = 'CHARSTATELABELS
+     1 (intentionally_blank) /,
+     2 /,
+     3 %_coverage /,
+     4 #_of_widgets /,
+     5 !endangered! /,
+     6 @the_front /,
+     7 =antennae,
+     8 `a_=_2` /,
+     9 -35_or-36 ,
+     10 27_or_less /,
+     11 fine_not_fine /,
+     12 3,
+      ;'
+
+    builder = NexusParser::Builder.new
+    lexer = NexusParser::Lexer.new(input)
+
+    (0..11).each{builder.stub_chr()}
+
+    NexusParser::Parser.new(lexer,builder).parse_chr_state_labels
+
+    foo = builder.nexus_file
+
+    assert_equal 12, foo.characters.size
+    assert_equal "(intentionally_blank)", foo.characters[0].name
+    assert_equal "Undefined", foo.characters[1].name
+    assert_equal "%_coverage", foo.characters[2].name
+    assert_equal "#_of_widgets", foo.characters[3].name
+    assert_equal "!endangered!", foo.characters[4].name
+    assert_equal "@the_front", foo.characters[5].name
+    assert_equal "=antennae", foo.characters[6].name # =3
+    assert_equal "`a_=_2`", foo.characters[7].name
+    assert_equal "-35_or-36", foo.characters[8].name
+    assert_equal "27_or_less", foo.characters[9].name
+    assert_equal "fine_not_fine", foo.characters[10].name
+    assert_equal "3", foo.characters[11].name
   end
 
   def test_parse_chr_state_labels
@@ -867,12 +874,86 @@ class Test_Parser < Test::Unit::TestCase
 
   end
 
+  def test_arbitrary_unquoted_character_state_labels
+    input = 'CHARSTATELABELS 1 Tibia_II /
+      .5
+      .1.2_form
+      idsimple
+      %_of_length_less_than_10
+      !poisonous!
+      #_is_3_or_4
+      (leave_as_is)
+      @12_o_clock
+      >2
+      ~equal
+      =9
+      ;'
+
+    builder = NexusParser::Builder.new
+    lexer = NexusParser::Lexer.new(input)
+
+    builder.stub_chr()
+
+    NexusParser::Parser.new(lexer,builder).parse_chr_state_labels
+
+    foo = builder.nexus_file
+
+    assert_equal ".5", foo.characters[0].states["0"].name
+    assert_equal ".1.2_form", foo.characters[0].states["1"].name
+    assert_equal "idsimple", foo.characters[0].states["2"].name
+    assert_equal "%_of_length_less_than_10", foo.characters[0].states["3"].name
+    assert_equal "!poisonous!", foo.characters[0].states["4"].name
+    assert_equal "#_is_3_or_4", foo.characters[0].states["5"].name
+    assert_equal "(leave_as_is)", foo.characters[0].states["6"].name
+    assert_equal "@12_o_clock", foo.characters[0].states["7"].name
+    assert_equal ">2", foo.characters[0].states["8"].name
+    assert_equal "~equal", foo.characters[0].states["9"].name
+    assert_equal "=9", foo.characters[0].states["10"].name
+  end
+
+  def test_arbitrary_quote_and_quotelike_character_state_labels
+    # We could tighten up our handling of accidentally unclosed quotes, but
+    # there's pretty much no way to recover in general, so we're not testing
+    # them here.
+    # Things like ""asdf" " failing is a known issue (maybe not solvable with
+    # regular expressions?).
+    input = 'CHARSTATELABELS 1 Tibia_II /
+      asd"f"
+      asd_\'f\'
+      as\'df
+      "asd, \'f\'"
+      ""a\'sdf  "
+      \'  /as"df/\'
+      \'asdf;\'
+      ""as, df""
+      ;'
+
+    builder = NexusParser::Builder.new
+    lexer = NexusParser::Lexer.new(input)
+
+    builder.stub_chr()
+
+    NexusParser::Parser.new(lexer,builder).parse_chr_state_labels
+
+    foo = builder.nexus_file
+
+    assert_equal 'asd"f"', foo.characters[0].states["0"].name
+    assert_equal 'asd_\'f\'', foo.characters[0].states["1"].name
+    assert_equal 'as\'df', foo.characters[0].states["2"].name
+    assert_equal 'asd, \'f\'', foo.characters[0].states["3"].name
+    assert_equal '"a\'sdf', foo.characters[0].states["4"].name
+    assert_equal '/as"df/', foo.characters[0].states["5"].name
+    assert_equal 'asdf;', foo.characters[0].states["6"].name
+    assert_equal '"as, df"', foo.characters[0].states["7"].name
+  end
+
+
   def test_number_label_chr_state_labels
-    # Character state names that are Labels but start with Numbers
+    # Character state names that start with Numbers
     input = 'CHARSTATELABELS 1 Tibia_II /
       123abc
-      1.23abc
-      3e-3abc
+      -1.23abc
+      -3e-3abc
       25%_or_less_than
       ;'
 
@@ -886,17 +967,17 @@ class Test_Parser < Test::Unit::TestCase
     foo = builder.nexus_file
 
     assert_equal "123abc", foo.characters[0].states["0"].name
-    assert_equal "1.23abc", foo.characters[0].states["1"].name
-    assert_equal "3e-3abc", foo.characters[0].states["2"].name
+    assert_equal "-1.23abc", foo.characters[0].states["1"].name
+    assert_equal "-3e-3abc", foo.characters[0].states["2"].name
     assert_equal "25%_or_less_than", foo.characters[0].states["3"].name
   end
 
   def test_value_pair_label_chr_state_labels
-    # Character state names that are both Labels and ValuePairs
+    # Character state names that are ValuePairs
     input = 'CHARSTATELABELS 1 Tibia_II /
       n=2
-      a==b
-      234=abc
+      a="b"
+      234=(a_b_c)
       ;'
 
     builder = NexusParser::Builder.new
@@ -908,9 +989,9 @@ class Test_Parser < Test::Unit::TestCase
 
     foo = builder.nexus_file
 
-    assert_equal "n=2", foo.characters[0].states["0"].name
-    assert_equal "a==b", foo.characters[0].states["1"].name
-    assert_equal "234=abc", foo.characters[0].states["2"].name
+    assert_equal 'n=2', foo.characters[0].states["0"].name
+    assert_equal 'a="b"', foo.characters[0].states["1"].name
+    assert_equal '234=(a_b_c)', foo.characters[0].states["2"].name
   end
 
   # https://github.com/mjy/nexus_parser/issues/9

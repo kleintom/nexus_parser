@@ -194,28 +194,24 @@ class NexusParser::Parser
         break
       else
         opts = {}
-
         name = ""
-        index = @lexer.pop(NexusParser::Tokens::Number).value.to_i
-        (name = @lexer.pop(NexusParser::Tokens::Label).value) if @lexer.peek(NexusParser::Tokens::Label) # not always given a letter
+
+        # Need a no_cache_read here since the SemiColon peek above could have
+        # matched a ValuePair like '1 =3 / yes no' (or any other non-Number
+        # token) instead of the Number 1.
+        (index = @lexer.pop(NexusParser::Tokens::Number).value.to_i) if @lexer.peek_no_cache_read(NexusParser::Tokens::Number)
+
+        (name = @lexer.pop(NexusParser::Tokens::CharacterLabel).value) if @lexer.peek(NexusParser::Tokens::CharacterLabel) # not always given a letter
 
         @lexer.pop(NexusParser::Tokens::BckSlash) if @lexer.peek(NexusParser::Tokens::BckSlash)
 
         if !@lexer.peek(NexusParser::Tokens::Comma) || !@lexer.peek(NexusParser::Tokens::SemiColon)
           i = 0
 
-          while @lexer.peek_no_cache_read(NexusParser::Tokens::Label) ||
-            @lexer.peek_no_cache_read(NexusParser::Tokens::DashLabel)
-
-            if @lexer.peek_no_cache_read(NexusParser::Tokens::Label)
-              opts.update({
-                i.to_s => @lexer.pop(NexusParser::Tokens::Label).value
-              })
-            elsif @lexer.peek_no_cache_read(NexusParser::Tokens::DashLabel)
-              opts.update({
-                i.to_s => @lexer.pop(NexusParser::Tokens::DashLabel).value
-              })
-            end
+          while @lexer.peek_no_cache_read(NexusParser::Tokens::CharacterLabel)
+            opts.update({
+              i.to_s => @lexer.pop(NexusParser::Tokens::CharacterLabel).value
+            })
 
             i += 1
           end

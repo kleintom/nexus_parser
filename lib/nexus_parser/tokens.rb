@@ -1,7 +1,7 @@
 module NexusParser::Tokens
 
   ENDBLKSTR = '(end|endblock)'.freeze
-  UNQUOTEDLABEL = '\w[^,:(); \t\n]*'
+  QUOTEDLABEL = '(\'+[^\']+\'+)|(\"+[^\"]+\"+)'
 
   class Token
     # this allows access the the class attribute regexp, without using a class variable
@@ -90,15 +90,14 @@ module NexusParser::Tokens
   end
 
   class Label < LabelBase
-    @regexp = Regexp.new(/\A\s*((\'+[^\']+\'+)|(\"+[^\"]+\"+)|(#{UNQUOTEDLABEL})+)\s*/) #  matches "foo and stuff", foo, 'stuff or foo', '''foo''', """bar""" BUT NOT ""foo" "
+    @regexp = Regexp.new(/\A\s*(#{QUOTEDLABEL}|(\w[^,:(); \t\n]*)+)\s*/) #  matches "foo and stuff", foo, 'stuff or foo', '''foo''', """bar""" BUT NOT ""foo" "
     def initialize(str)
       super(str)
     end
   end
 
-  # An unquoted Label that starts with a dash
-  class DashLabel < LabelBase
-    @regexp = Regexp.new(/\A\s*(-#{UNQUOTEDLABEL})\s*/)
+  class CharacterLabel < LabelBase
+    @regexp = Regexp.new(/\A\s*(#{QUOTEDLABEL}|[^ \t\n\/,;]+)\s*/)
     def initialize(str)
       super(str)
     end
@@ -317,7 +316,6 @@ module NexusParser::Tokens
       NexusParser::Tokens::LBracket,
       NexusParser::Tokens::RBracket,
       NexusParser::Tokens::Label, # must be before RowVec
-      NexusParser::Tokens::DashLabel,
       NexusParser::Tokens::RowVec,
       NexusParser::Tokens::LinkLine,
     ]
